@@ -7,8 +7,6 @@ import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1DeploymentList;
-import lombok.Builder;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,10 +26,7 @@ public class DeploymentEventsService {
             SharedInformerFactory informerFactory,
             @Value("${namespace}") String namespace) {
 
-        log.info("Creating asynchronous team-app service, Namespace={}", namespace);
-        AppsV1Api appsV1Api = new AppsV1Api(client);
-
-        informer = informerFactory.sharedIndexInformerFor(params -> appsV1Api.listNamespacedDeploymentCall(
+        informer = informerFactory.sharedIndexInformerFor(params -> new AppsV1Api(client).listNamespacedDeploymentCall(
                         namespace,
                         null,
                         null,
@@ -54,27 +49,19 @@ public class DeploymentEventsService {
             }
 
             @Override
-            public void onUpdate(V1Deployment oldObj, V1Deployment newObj) {
-                handleDeploymentUpdated(oldObj, newObj);
-            }
-
-            @Override
             public void onDelete(V1Deployment obj, boolean deletedFinalStateUnknown) {
                 /* don't need to pay attention to this event for our use case */
             }
+
+            @Override
+            public void onUpdate(V1Deployment oldObj, V1Deployment newObj) {
+
+                debug(oldObj, "updated-old");
+                debug(newObj, "updated-new");
+
+                logDeploymentStatusIfInteresting(oldObj, newObj);
+            }
         });
-    }
-
-    private void handleDeploymentUpdated(V1Deployment oDeployment, V1Deployment nDeployment) {
-
-        debug(oDeployment, "updated-old");
-        debug(nDeployment, "updated-new");
-
-        getDeploymentStatusIfDone(oDeployment, nDeployment)
-                .ifPresent(status -> log.info("Deployment: App={}, Team={}, Status={}",
-                        status.getApp(),
-                        status.getTeam(),
-                        status.getStatus()));
     }
 
     private void debug(V1Deployment deployment, String event) {
@@ -104,42 +91,23 @@ public class DeploymentEventsService {
                 .isPresent();
     }
 
-    private Optional<DeploymentStatus> getDeploymentStatusIfDone(V1Deployment oldDeployment, V1Deployment newDeployment) {
-
+    private void logDeploymentStatusIfInteresting(V1Deployment oldDeployment, V1Deployment newDeployment) {
         if (!hasCondition(oldDeployment, "NewReplicaSetCreated", "True") && hasCondition(newDeployment, "NewReplicaSetCreated", "True")) {
-            return Optional.of(DeploymentStatus.builder()
-                    .app(newDeployment.getMetadata().getName())
-                    .team(newDeployment.getMetadata().getLabels().get("team"))
-                    .status("Started")
-                    .build());
-        }
-
-        if (hasCondition(oldDeployment, "ReplicaSetUpdated", "True")) {
+            logDeploymentStatus(newDeployment, "Started");
+        } else if (hasCondition(oldDeployment, "ReplicaSetUpdated", "True")) {
             if (hasCondition(newDeployment, "NewReplicaSetAvailable", "True")) {
-                return Optional.of(DeploymentStatus.builder()
-                        .app(newDeployment.getMetadata().getName())
-                        .team(newDeployment.getMetadata().getLabels().get("team"))
-                        .status("Finished/Success")
-                        .build());
-            }
-            if (hasCondition(newDeployment, "ProgressDeadlineExceeded", "False")) {
-                return Optional.of(DeploymentStatus.builder()
-                        .app(newDeployment.getMetadata().getName())
-                        .team(newDeployment.getMetadata().getLabels().get("team"))
-                        .status("Finished/Failed")
-                        .build());
+                logDeploymentStatus(newDeployment, "Finished/Success");
+            } else if (hasCondition(newDeployment, "ProgressDeadlineExceeded", "False")) {
+                logDeploymentStatus(newDeployment, "Finished/Failed");
             }
         }
-
-        return Optional.empty();
     }
 
-    @Builder
-    @Getter
-    public static class DeploymentStatus {
-        String app;
-        String team;
-        String status;
+    private void logDeploymentStatus(V1Deployment newDeployment, String s) {
+        log.info("***** Deployment: App={}, Team={}, Status={} *****",
+                newDeployment.getMetadata().getName(),
+                newDeployment.getMetadata().getLabels().get("team"),
+                s);
     }
 
     @PostConstruct
