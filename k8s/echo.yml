@@ -6,6 +6,7 @@ metadata:
     team: cypress
 spec:
   replicas: 2
+  progressDeadlineSeconds: 60
   selector:
     matchLabels:
       app: echo-app
@@ -15,7 +16,7 @@ spec:
         app: echo-app
     spec:
       containers:
-      - name: not-main
+      - name: main
         image: k8s.gcr.io/echoserver:1.10
         ports:
         - containerPort: 8080
