@@ -10,25 +10,31 @@ import java.util.Optional;
 @Slf4j
 public class DeploymentEventsHandler implements ResourceEventHandler<V1Deployment> {
 
+    @Override
     public void onAdd(V1Deployment obj) {
         /* don't need to pay attention to this event for our use case */
     }
 
+    @Override
     public void onDelete(V1Deployment obj, boolean deletedFinalStateUnknown) {
         /* don't need to pay attention to this event for our use case */
     }
 
+    @Override
     public void onUpdate(V1Deployment oldObj, V1Deployment newObj) {
 
         debug(oldObj, "updated-old");
         debug(newObj, "updated-new");
 
         if (!hasCondition(oldObj, "ReplicaSetUpdated", "True") && hasCondition(newObj, "ReplicaSetUpdated", "True")) {
+            /* Deployment is started */
             logDeploymentStatus(newObj, "Started");
         } else if (hasCondition(oldObj, "ReplicaSetUpdated", "True")) {
             if (hasCondition(newObj, "NewReplicaSetAvailable", "True")) {
+                /* Deployment is finished successfully */
                 logDeploymentStatus(newObj, "Finished/Success");
             } else if (hasCondition(newObj, "ProgressDeadlineExceeded", "False")) {
+                /* Deployment is finished in a failure - progress-deadline exceeded */
                 logDeploymentStatus(newObj, "Finished/Failed");
             }
         }
@@ -66,6 +72,7 @@ public class DeploymentEventsHandler implements ResourceEventHandler<V1Deploymen
     }
 
     private void logDeploymentStatus(V1Deployment deployment, String status) {
+        /* instead of logging we could put a message in a slack channel */
         log.info("***** Deployment: App={}, Team={}, Status={} *****",
                 deployment.getMetadata().getName(),
                 deployment.getMetadata().getLabels().get("team"),

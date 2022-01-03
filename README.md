@@ -1,16 +1,15 @@
 # sample-deployment-events
 
-A sample spring-boot app that uses *Kubernetes API for Java* to detect important deployment events. Specifically, if detects when a *Deployment* has started and when it is finished.
+A sample spring-boot app that uses *Kubernetes API for Java* to detect important deployment events. Specifically, if detects when a *Deployment* has started and when it finishes.
 
 ### Build Pre-requisites
 
 - JDK 11
-- `kubectl`
 
 ### Running Pre-requisites
 
-- Access to a Kubernetes cluster
-- A namespace where you schedule some deployments (`dev` by default)
+- Access to a Kubernetes cluster via `kubectl`
+- A namespace where you can schedule some deployments (`dev` by default)
 - The `team` label assigned to all deployments that you want this app to pay attention to
 
 ### Building/Running the app

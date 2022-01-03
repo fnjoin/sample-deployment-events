@@ -24,7 +24,8 @@ public class DeploymentEventsService {
             SharedInformerFactory informerFactory,
             @Value("${namespace}") String namespace) {
 
-        informer = informerFactory.sharedIndexInformerFor(params -> new AppsV1Api(client).listNamespacedDeploymentCall(
+        informer = informerFactory.sharedIndexInformerFor(
+                params -> new AppsV1Api(client).listNamespacedDeploymentCall(
                         namespace,
                         null,
                         null,
